@@ -129,6 +129,18 @@ CALLBACK sould be a callback function"
          (url-request-extra-headers `(("X-ChatWorkToken" . ,chatwork-token))))
      (url-retrieve (chatwork-api-url ,path) ,callback nil t)))
 
+(defmacro chatwork-post (path data)
+  "Send POST request to ChatWork
+
+PATH should start with \"/\".
+DATA should be decoded with `html-hexify-string' if they contains multibyte."
+  `(let ((url-request-method "POST")
+         (url-request-extra-headers `(("Content-Type" . "application/x-www-form-urlencoded")
+                                      ("X-ChatWorkToken" . ,chatwork-token)))
+         (url-request-data ,data))
+     (url-retrieve (chatwork-api-url ,path)
+                   'chatwork-post-callback)))
+
 (defun chatwork-me ()
   (chatwork-get "/me" 'chatwork-me-callback))
 
@@ -140,6 +152,14 @@ CALLBACK sould be a callback function"
                                   (json-read))))
             (setq chatwork-me-plist json-data))
         (kill-buffer)))))
+
+(defun chatwork-create-room (name)
+  (interactive "sRoom name: ")
+  (or chatwork-me-plist (chatwork-me))
+  (chatwork-post "/rooms"
+                 (concat
+                  "name=" (url-hexify-string name)
+                  "&members_admin_ids=" (number-to-string (plist-get chatwork-me-plist :account_id)))))
 
 (defalias 'chatwork-update-rooms 'chatwork-get-rooms)
 
@@ -291,18 +311,6 @@ ROOM-ID is an ad number of the room."
     (chatwork-update-rooms))
   (while (not chatwork-room-alist)
     (sleep-for 1)))
-
-(defmacro chatwork-post (path data)
-  "Send POST request to ChatWork
-
-PATH should start with \"/\".
-DATA should be decoded with `html-hexify-string' if they contains multibyte."
-  `(let ((url-request-method "POST")
-         (url-request-extra-headers `(("Content-Type" . "application/x-www-form-urlencoded")
-                                      ("X-ChatWorkToken" . ,chatwork-token)))
-         (url-request-data ,data))
-     (url-retrieve (chatwork-api-url ,path)
-                   'chatwork-post-callback)))
 
 (defun chatwork-post-message (message room-id)
   "Send MESSAGE to ROOM in ChatWork"
